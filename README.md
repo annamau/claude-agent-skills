@@ -9,13 +9,11 @@ The through-line is one idea: **a single lead agent — the HAWK — runs a team
 | Skill | Role | Use when |
 |---|---|---|
 | **plan-with-review** | Architect | You have a non-trivial idea and no plan. Assembles a domain-expert team that researches (online + in your codebase), surfaces conflicts, drafts a plan, then verifies it against live ground truth. Emits a **Team Roster + file-ownership map**. |
-| **phases-execution** | The HAWK (Product Owner + Tech Lead) | You have an approved multi-phase plan. Dispatches the expert team as a **concurrent team in one shared worktree** (ownership map + lock ledger), supervises them live (steers drift, escalates, answers their questions via research), runs a **cross-model review** on every functionality commit, keeps a workflow board, and files postmortems when a session goes bad. |
+| **phases-execution** | The HAWK (Product Owner + Tech Lead) | You have an approved multi-phase plan to execute, **or** a non-trivial refactor/rewrite to drive. Dispatches the expert team as a **concurrent team in one shared worktree** (ownership map + lock ledger), supervises them live (steers drift, escalates, answers their questions via research), runs a **cross-model review** on every functionality, forces an honest **patch-or-real-solution verdict** before each ship (no patches — escalate to a new plan instead), keeps a workflow board, and files postmortems when a session goes bad. |
 | **copilot-review-loop** | Cross-model PR gate | A PR is open and not yet merged. Triggers a differently-trained reviewer (default: OpenAI Codex), loops on findings with a hard cap, root-causes repeats, and applies a Product-Owner acceptance gate before "ready to merge." |
-| **phase-based-refactor** | Refactor rhythm | A risky refactor/rewrite where the danger is "piling on patches." Forces IMPLEMENT → TEST → PRODUCT-THINK → INDEPENDENTLY VERIFY → SHIP per phase. |
-| **brain-builder** | Knowledge-base engineer | You want to build / bulk-ingest / deep-garden a repo-based **company brain** (a linked-markdown vault). Works at whole-vault scale with numeric health gates. |
-| **vault-librarian** | Knowledge-base librarian | Day-to-day recall and filing into that brain — recall state before work, file findings/decisions/postmortems after. |
+| **brain** | Company-brain manager | Build, recall from, file into, and garden a repo-based **company brain** (a linked-markdown vault). One skill across scales — daily recall + single-note filing (`W-RECALL`, `W-FILE-FINDING`) through bulk ingestion and deep numeric-gated gardening (`W-INGEST-CAMPAIGN`, `W-GARDEN`). |
 
-`plan-with-review → phases-execution → copilot-review-loop` is the main pipeline. `brain-builder` + `vault-librarian` are the memory layer the hawk reads from and writes to.
+`plan-with-review → phases-execution → copilot-review-loop` is the main pipeline. **brain** is the durable memory layer the hawk reads from before work and writes to after.
 
 ## Design principles (why these exist)
 

@@ -78,8 +78,9 @@ Ledger files (never owned, claim via LOCKS.md): <paths or "none">
 ## Tasks
 ### Phase N — <name>   [pending | implementing | review | looping | accepted | committed | blocked]
 - Gear: FULL/LITE · Loop count: 0 · Commit: <sha or —>
-- Gates: [ ] review · [ ] tests · [ ] 5a security · [ ] 5c cross-model (e.g. Codex) · [ ] PO · [ ] consistency
+- Gates: [ ] review · [ ] tests · [ ] 5a security · [ ] 5c cross-model (e.g. Codex) · [ ] PO · [ ] 6a patch-or-real · [ ] consistency
 - Cross-model (5c) findings: <P2/P3 carried to PR round, dismissed-FP evidence lines>
+- 6a verdict: <real solution | named patch (real fix → phase N) | escalated to new plan> + one-line evidence
 - Notes: <delta-scope, steers issued, worker questions answered>
 
 ## Activity log (append-only, newest first)
@@ -266,3 +267,38 @@ If it hits the 600s timeout or appears to wait for input (device-code login prom
 Brief rules: provenance-free (no "written by", no "tests pass"); the commit SHA scopes the diff. The CLI also offers `--uncommitted` (staged + unstaged + untracked) — **never use it in a shared tree**: it would sweep teammates' WIP into the review. Committing first, then reviewing the commit, is the whole point of the ordering.
 
 Hawk triage rubric: **P0/P1** (correctness, security, data loss, contract violation) → block, failure protocol, re-run 5c on the fix commit · **P2/P3** → board task entry, batch into the PR round · **false positive** → dismiss WITH one evidence line on the board. Rate-limit/auth failure → board note + in-family fallback reviewer for this gate + explicit flag so `copilot-review-loop` covers it at the PR.
+
+## 11. Patch-or-Real-Solution product-think (Step 6a)
+
+Durable, not ephemeral — lands in the functionality commit message OR the board task entry OR the plan/roadmap doc, so a later reviewer (human or subagent) can audit it. **Time-boxed to ~15 minutes of drafting** — if it takes longer, you're dressing up a patch, and that's the answer. Honest and un-hedged: if you can't write the "is this a patch?" line without hedging, it's a patch — own it and scope a real phase after.
+
+```md
+## Phase {X} — Patch or Real Solution?
+
+### What this changes
+Files modified, net LOC, the concrete behavior changes (not "improved X" — name what
+now happens that didn't before).
+
+### Is this a patch?
+Honest yes/no + one paragraph of evidence. A patch is:
+- another regex trying to repair the previous step's output, OR
+- a flag that preserves legacy behavior alongside the new behavior, OR
+- a single-instance fix that doesn't generalize to the pattern.
+
+### Is this a real solution?
+Name the invariants the new code enforces by construction. Name the bugs it makes
+impossible — not "less likely," impossible, enforced by types / schemas / tests.
+
+### Honest weaknesses
+What's deferred, what's best-effort, what's a known workaround. Don't hide these; the
+next phase (or the reviewer) needs to pick them up.
+
+### Recommendation
+Ship / iterate / escalate-to-a-new-plan.
+```
+
+Reading the recommendation:
+- **Ship** — it's a real solution (or a patch honestly named as one, with the real fix deferred to its own future phase). Proceed through the rest of the PO gate.
+- **Escalate-to-a-new-plan** — it's a patch dressed as a real solution, or the real fix is bigger than this plan anticipated. This does NOT loop the implementer and does NOT shrink the phase goals to make the diff pass (moving goalposts is the sibling of shipping patches). It goes out the PO gate's **ESCALATE TO A NEW PLAN** rung — back to `plan-with-review` for a new phase or plan.
+
+Record the verdict + recommendation on the board alongside the PO verdict.

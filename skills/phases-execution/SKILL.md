@@ -1,6 +1,7 @@
 ---
 name: phases-execution
-description: Use when the user has an approved multi-phase plan and asks to execute or ship it ("execute the plan", "ship the phases", "let's get all phases done", "implement phases X-Y", "run this as the hawk", "execute with the team"). Acts as the HAWK — Product Owner + Technical Lead + live supervisor. Reads the Team Roster from plan-with-review, defines acceptance criteria per phase, dispatches domain experts as a CONCURRENT TEAM in one shared worktree (file-ownership map + lock ledger — not sequential, not isolated worktrees), supervises them while they run (steers drift mid-flight, escalates bigger issues, answers worker questions via experts + online research), runs a cross-model review (a differently-trained model from another vendor, e.g. OpenAI Codex CLI) on every finished functionality, keeps the workflow board in the repo brain current, detects poisoned sessions via smell tripwires, and files postmortems for sessions that end badly. Never lets a subagent self-declare "done." Atomic commit per functionality. Pairs with plan-with-review (which produces the plan this skill executes).
+description: >-
+  Use when the user has an approved multi-phase plan and asks to execute or ship it ("execute the plan", "ship the phases", "let's get all phases done", "implement phases X-Y", "run this as the hawk", "execute with the team"), OR asks to drive a non-trivial refactor, architectural rewrite, multi-phase system overhaul, or clean-sheet rewrite ("refactor this", "architectural rewrite", "multi-phase system overhaul", "real solution not another patch", "clean-sheet rewrite", "restructure X phase by phase"). Acts as the HAWK — Product Owner + Technical Lead + live supervisor. Reads the Team Roster from plan-with-review, defines acceptance criteria per phase, dispatches domain experts as a CONCURRENT TEAM in one shared worktree (file-ownership map + lock ledger — not sequential, not isolated worktrees), supervises them while they run (steers drift mid-flight, escalates bigger issues, answers worker questions via experts + online research), runs a cross-model review (a differently-trained model from another vendor, e.g. OpenAI Codex CLI) on every finished functionality, forces an honest patch-or-real-solution product-think verdict before each functionality ships (no patches, full solutions), keeps the workflow board in the repo brain current, detects poisoned sessions via smell tripwires, and files postmortems for sessions that end badly. Never lets a subagent self-declare "done." Atomic commit per functionality. Pairs with plan-with-review (which produces the plan this skill executes).
 license: MIT
 metadata:
   author: annamau
@@ -11,7 +12,9 @@ metadata:
 
 **Meta-instruction:** You are not a relay. You are the HAWK: Product Owner and Technical Lead of a live team of expert subagents. Your job is to hold the vision, define what "done" means for each phase, watch the team WHILE it works (not only at the gates), steer anyone who diverges back on course, answer their questions with experts and online research instead of guessing, and be the only one who declares a phase complete. Subagents implement. You decide — and you keep the context alive on the board, so nothing is ever re-derived from a stale transcript.
 
-**The rule:** A plan that's been approved is not the same as a plan that's been shipped. You own the gap between those two states. Every phase ships through an eight-step rhythm (steps 5a/5b are mandatory sub-gates of step 5, so the real gate count is higher than eight — do not let the headline number tempt you to skip them); no phase is "done" until its acceptance criteria pass, tests are green, the security floor is clean, a consistency-check agent confirms nothing drifted from the plan, and you — the orchestrator — have personally reviewed the deliverable against the goal.
+**The rule:** A plan that's been approved is not the same as a plan that's been shipped. You own the gap between those two states. Every phase ships through an eight-step rhythm (steps 5a/5b/5c and 6a are mandatory sub-gates of their parent steps, so the real gate count is higher than eight — do not let the headline number tempt you to skip them); no phase is "done" until its acceptance criteria pass, tests are green, the security floor is clean, the patch-or-real-solution verdict is honestly "real solution," a consistency-check agent confirms nothing drifted from the plan, and you — the orchestrator — have personally reviewed the deliverable against the goal.
+
+**The hawk's principle — NO PATCHES, FULL SOLUTIONS.** The whole reason the plan exists is to buy a real solution, not a stack of patches. A patch is another regex repairing the previous step's output, a flag that preserves legacy behavior alongside the new shape, or a single-instance fix that doesn't generalize to the pattern. Every functionality earns a durable, honest patch-or-real-solution verdict before it ships (Step 6a). And when the honest verdict is *"this is a patch dressed as a real solution"* or *"the real fix is bigger than this plan anticipated,"* you do NOT pile on more patches — you **escalate to create a new plan**: route back to `plan-with-review` for a new phase or a new plan (same rung as "the plan assumption is wrong / scope is larger than expected"). Fixing that verdict by quietly loosening the phase goals instead of the code is moving goalposts — the sibling of shipping patches.
 
 **The three roles you hold simultaneously:**
 - **Product Owner** — you hold the user's goal. You decide whether a deliverable actually achieves what the plan promised. You write the acceptance criteria. You call "done" or "not done."
@@ -25,7 +28,7 @@ The eight steps, per phase, in order:
 3. **INDEPENDENT REVIEW (subagent)** — fresh reviewer audits the diff against the contract and the spec.
 4. **QUALITY GATES + KPIs** — explicit pass/fail checks with numbers from the plan.
 5. **UNIT + INTEGRATION + MISUSE TESTS** — full test scaffold from the plan (misuse test not optional), then **5a SECURITY FLOOR** (secrets scan + dependency verification + injection misuse test — non-waivable in any gear), **5b FULL-STACK E2E** (planner-owned, after the round), and **5c CROSS-MODEL REVIEW** (a CROSS-MODEL REVIEWER — a differently-trained model from a different vendor than the implementer, e.g. OpenAI Codex CLI — reviews the functionality commit, because same-family reviewers share the implementer's blind spots).
-6. **ORCHESTRATOR ACCEPTANCE REVIEW** — you personally review the deliverable against the goal and AC. This is not the same as the reviewer subagent's pass. This is the PO gate.
+6. **ORCHESTRATOR ACCEPTANCE REVIEW** — you personally review the deliverable against the goal and AC. This is not the same as the reviewer subagent's pass. This is the PO gate. It carries a mandatory sub-gate: **6a PRODUCT-THINK (patch or real solution?)** — before the phase ships, the hawk (or the phase owner) writes an honest, durable patch-or-real-solution verdict; a "patch dressed as a real solution" verdict escalates to a new plan rather than looping.
 7. **CONSISTENCY CHECK (subagent)** — fresh agent verifies no contract violations, no assumption drift, no plan divergence across phases.
 8. **COMMIT / PR** — commit, PR, repo review loop (or `/code-review`), user greenlight.
 
@@ -338,11 +341,48 @@ Ask these questions for every phase before calling it done:
 - If it migrated schema: is the migration expand-contract (old code still runs against the new schema), so rollback is real and not theoretical?
 
 **The PO verdict:**
-- **ACCEPTED** — all must-pass AC gates satisfied, goal alignment confirmed, no unaddressed drift. Proceed to step 7.
+- **ACCEPTED** — all must-pass AC gates satisfied, goal alignment confirmed, no unaddressed drift, and the Step 6a patch-or-real-solution verdict is honestly "real solution." Proceed to step 7.
 - **NEEDS EXPERT FIX** — specific AC gate(s) failed or drift detected. Dispatch the right expert (see failure protocol below). Do NOT generic-retry the same subagent.
-- **ESCALATE TO USER** — the problem is deeper than an implementation gap. The plan assumption is wrong, the scope is larger than expected, or two experts' requirements are genuinely irreconcilable. Surface with a diagnosis, not just a symptom.
+- **ESCALATE TO A NEW PLAN** — the problem is deeper than an implementation gap. The plan assumption is wrong, the scope is larger than expected, two experts' requirements are genuinely irreconcilable, **or the Step 6a verdict came back "this is a patch dressed as a real solution" / "the real fix is bigger than this plan anticipated."** These are NOT fixed by piling on more patches and NOT by quietly loosening the phase goals (moving goalposts is the sibling of shipping patches). Route back to `plan-with-review` to create or extend the plan — a new phase or a new plan — and surface it to the user with a diagnosis, not just a symptom.
 
 Record the verdict and its evidence pointers on the board before moving on — the board survives compaction; this conversation doesn't.
+
+### Step 6a — PRODUCT-THINK (patch or real solution?)
+
+The PO gate has a mandatory sub-gate. After a functionality's tests pass and before it ships, the hawk — or the phase owner reporting to the hawk — writes an **honest, durable patch-or-real-solution assessment**. Durable means it lands somewhere a later reviewer (human or subagent) can audit it: the functionality commit message OR the board's task entry OR the plan/roadmap doc — never ephemeral chat.
+
+**Time-box the drafting to ~15 minutes.** Longer means you are dressing up a patch as a real solution — that itself is the answer.
+
+Write these explicit sections (skeleton: `reference/templates.md` §11):
+
+```md
+## Phase {X} — Patch or Real Solution?
+
+### What this changes (files modified, net LOC, concrete behavior changes)
+
+### Is this a patch?
+Honest yes/no + one paragraph of evidence. A patch is: another regex repairing the
+previous step's output, OR a flag that preserves legacy behavior alongside the new
+shape, OR a single-instance fix that doesn't generalize to the pattern.
+
+### Is this a real solution?
+Name the invariants the new code enforces by construction. Name the bugs it makes
+impossible — not "less likely," impossible, enforced by types / schemas / tests.
+
+### Honest weaknesses
+What's deferred, what's best-effort, what's a known workaround. Don't hide these; the
+next phase (or the reviewer) needs to pick them up.
+
+### Recommendation
+Ship / iterate / escalate-to-a-new-plan.
+```
+
+**Reading the verdict:**
+- **Real solution** → the recommendation is *ship*; proceed through the rest of the PO gate.
+- **Honest patch, scoped as such** → if the phase was legitimately a patch and it's named as one with the real fix deferred to its own future phase, that can *ship* — a named patch is honest; a patch disguised as a real solution is not.
+- **Patch dressed as a real solution**, or the real fix is bigger than this plan anticipated → the recommendation is *escalate-to-a-new-plan*. This does not loop the implementer and does not shrink the phase goals to make the diff "pass." It goes out the **ESCALATE TO A NEW PLAN** rung above — back to `plan-with-review` for a new phase or plan.
+
+**If you cannot write the "is this a patch?" answer without hedging, it's a patch** — own it, and scope a real phase after. The 6a verdict and its recommendation are recorded on the board alongside the PO verdict.
 
 ---
 
@@ -418,7 +458,7 @@ Gates catch failures at boundaries; supervision catches them in flight. What sep
 **Escalation ladder.**
 1. **Steer** — corrective message; worker continues with context intact.
 2. **Kill + respawn clean** — stop the agent, write what is verifiably TRUE so far to the board, respawn a fresh worker **briefed from the board, never from the dead session's transcript**. A poisoned context propagates its false beliefs to anything that inherits it; the board carries only hawk-verified state. A second respawn escalates one model tier (per the tiering rules).
-3. **Escalate to the user** — only for genuine scope, product, or policy calls, or irreconcilable expert requirements. Deliver a diagnosis with options, not a symptom.
+3. **Escalate to the user / a new plan** — only for genuine scope, product, or policy calls, or irreconcilable expert requirements. This is also the rung for the Step 6a verdict "this is a patch dressed as a real solution" or "the real fix is bigger than this plan anticipated": the answer is never more patches and never quietly loosening the phase goals to make the diff pass — route back to `plan-with-review` to create or extend the plan (a new phase or a new plan). Deliver a diagnosis with options, not a symptom.
 
 **Answering workers.** When a worker is blocked on missing knowledge — a third-party behavior, a domain convention, an API's current shape — do not guess, and do not bounce it to the user. Spawn the relevant roster expert (or a fresh research agent with today's date and web search), get a sourced answer, relay it, and note it on the board. The user is the escalation path for *decisions*; facts are yours to research.
 
@@ -527,6 +567,8 @@ Only active when the user explicitly pre-authorized this execution to run withou
 - **Same-family-only review before merge** — the implementer's model family shares its blind spots; Step 5c exists because "our reviewer found nothing" is weak evidence about our own code.
 - **Skipping the postmortem after a kill** — an un-postmortemed divergence is scheduled to repeat. The note is incomplete until one harness change lands.
 - **Two hawks, zero awareness** — a second workflow claiming overlapping files without scanning the other boards recreates the clobber problem at workflow scale.
+- **Piling patches on patches** — a functionality that fails the Step 6a "is this a patch?" test doesn't get another regex or legacy-preserving flag stacked on it. No patches, full solutions: escalate to a new plan (a new phase or plan) instead.
+- **Moving the goalposts** — fixing a 6a "patch dressed as real solution" verdict (or a subagent finding) by quietly loosening the phase goals instead of the code. Moving goalposts is the sibling of shipping patches; if you can't write an honest "is this a patch" without hedging, it's a patch — own it and scope a real phase after.
 
 ---
 
@@ -540,6 +582,7 @@ A phase ships when:
 - Unit + integration + misuse tests are green.
 - Functionality commit staged from the owned set only; **cross-model review (5c) clean** (e.g. Codex) — zero P0/P1, lower findings triaged to the board.
 - **Orchestrator acceptance review passed** — goal alignment confirmed, no drift, advisory requirements satisfied.
+- **Step 6a patch-or-real-solution verdict is honestly "real solution"** (or a named patch with the real fix scoped to its own future phase) — recorded durably on the board/commit, drafted in ~15 min, not hedged.
 - Consistency-check agent returns zero violations.
 - PR open at round close, review-loop findings addressed, user has greenlit merge.
 - Board current through every gate; workflow worktree removed after the round merges.
@@ -554,12 +597,13 @@ A phase loops back to IMPLEMENT when:
 - Orchestrator acceptance review finds drift or unmet AC.
 - Consistency-check finds divergence.
 
-A phase escalates to the user when:
+A phase escalates to a new plan (via the user, back to `plan-with-review`) when:
 - 2 expert dispatch loops failed on the same AC gate.
 - The plan assumption is wrong (gate is unsatisfiable).
 - Two expert requirements are genuinely irreconcilable.
 - The dependency graph needs rebuilding.
 - The North Star is not moving after N phases.
+- The Step 6a verdict is "patch dressed as a real solution" or "the real fix is bigger than this plan anticipated" — pile on no more patches; scope a new phase or plan.
 
 ---
 
@@ -575,6 +619,7 @@ Do-confirm, not read-do: you already did the work — this catches what slipped.
 - [ ] Unit + integration + misuse green (scoped in flight, full suite at the round barrier); coverage on changed files did not decrease
 - [ ] Cross-model review (5c) ran on the functionality commit (e.g. Codex): zero P0/P1; P2/P3 and dismissed false positives recorded on the board
 - [ ] PO acceptance review done by YOU against the goal and the plain-language "done" — not delegated to any subagent
+- [ ] Step 6a patch-or-real-solution verdict written durably (board/commit), honest and un-hedged; a "patch dressed as real solution" verdict was escalated to a new plan, not patched over or goal-loosened
 - [ ] Consistency check returned zero violations (re-run after every loop-back)
 - [ ] Operational readiness: you can observe it in production and you can turn it off
 - [ ] Board current through every gate; PR open with AC gates listed; the USER merges, not you
