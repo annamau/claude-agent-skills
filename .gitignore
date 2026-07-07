@@ -1,0 +1,11 @@
+# Local, project-specific adapter files — pin your own {{REPO}}, review bot,
+# keystone notes, and taxonomy here. Never commit these; they are what keeps
+# the published skills org-agnostic.
+ADAPTER.*.md
+!ADAPTER.example.md
+
+# OS / editor cruft
+.DS_Store
+*.swp
+.idea/
+.vscode/
