@@ -41,15 +41,37 @@ TEST_PATH = re.compile(
 EDIT_TOOLS = {"Edit", "Write", "NotebookEdit", "MultiEdit"}
 
 
-def phase(cwd: str) -> str:
-    """Read the declared phase. Absent file means implementation ('green')."""
+def phase(cwd: str, target: str | None = None) -> str:
+    """Read the declared phase. Absent file means implementation ('green').
+
+    Resolved from the edited file upward, then from cwd. A session often edits
+    files in a different repo than the one it started in, and the phase belongs
+    to the repo being edited — otherwise declaring `red` in one checkout leaves
+    you unable to write tests in another.
+    """
     override = os.environ.get("SHIP_PHASE")
     if override:
         return override.strip().lower()
+
+    roots: list[Path] = []
+    if target:
+        try:
+            roots.extend(Path(target).resolve().parents)
+        except Exception:
+            pass
     try:
-        return (Path(cwd) / ".claude" / "ship-phase").read_text().strip().lower()
+        cwd_path = Path(cwd).resolve()
+        roots.append(cwd_path)
+        roots.extend(cwd_path.parents)
     except Exception:
-        return "green"
+        pass
+
+    for root in roots:
+        try:
+            return (root / ".claude" / "ship-phase").read_text().strip().lower()
+        except Exception:
+            continue
+    return "green"
 
 
 def deny(reason: str) -> int:
@@ -95,7 +117,7 @@ def main() -> int:
     if not TEST_PATH.search(probe):
         return 0
 
-    if phase(cwd) in ("red", "test", "tests"):
+    if phase(cwd, raw) in ("red", "test", "tests"):
         return 0
 
     return deny(

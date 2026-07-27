@@ -9,3 +9,5 @@ ADAPTER.*.md
 *.swp
 .idea/
 .vscode/
+.claude/ship-phase
+__pycache__/

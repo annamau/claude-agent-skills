@@ -17,6 +17,10 @@ jobs:
       - run: pip install tiktoken
       - name: every SKILL.md must survive compaction
         run: python3 scripts/check_skills.py
+      - name: the analyzer's own contract tests
+        run: python3 scripts/test_analyze_skill.py
+      - name: full skill audit (fails on any breach)
+        run: python3 scripts/analyze_skill.py
 
   hooks:
     name: hook contract tests
