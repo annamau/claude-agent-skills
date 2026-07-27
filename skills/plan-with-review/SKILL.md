@@ -1,222 +1,170 @@
 ---
 name: plan-with-review
-description: Use when the user asks to create or refine a non-trivial implementation plan, strategy doc, multi-phase rollout, architectural plan, or roadmap. Assembles a dynamic team of domain experts who research online + read the codebase, surfaces conflicts between expert views, drafts a plan from synthesized expert inputs, then has the same expert team verify it against live ground truth (real file:line, real queries, real third-party behavior) before any code gets written. The resulting plan hands off to the `ship` skill for execution. Triggers on phrases like "create a plan", "let's plan", "draft a roadmap", "design the rollout", "how should we approach", "before we start, plan...", "plan this out". Two gears — full rhythm for high-stakes or multi-phase work, lite (2 experts, merged verification) for mid-size tasks. Skip for trivial single-step tasks.
+description: Plan non-trivial work, then verify the plan against live ground truth before any code is written. Use for implementation plans, multi-phase rollouts, architectural designs, and roadmaps ("create a plan", "how should we approach", "design the rollout", "plan this out"). Hands off to `ship` for execution.
+when_to_use: When being wrong is expensive — money or safety paths, unfamiliar domains, three or more phases, or a prior attempt already failed. Skip for single-step tasks; a one-sentence diff needs no plan.
 license: MIT
-metadata:
-  author: annamau
-  version: "3.3.0"
 ---
 
-# Plan with Expert Team + Live-Ground-Truth Cross-Check
+# Plan, then verify the plan
 
-**Meta-instruction:** Do not optimize for task completion. Optimize for preventing future errors and reducing iteration loops. The goal is a plan that ships clean in one shot — not a plan that ships fast and causes three rollback PRs.
+Plans get graded by nothing. The diff gets reviewed against the plan, so a
+wrong plan passes review — a fabricated file path, a stale price, an API that
+does not behave the way the plan assumes. Nobody catches it, because the plan
+is the oracle.
 
-**The core shift from v2:** Plans are no longer drafted from Claude's priors. They are drafted from the synthesized output of domain experts who have done real research. Each expert searches online for current best practices (today's date is passed to them), reads the relevant codebase, and returns findings from their domain perspective. Conflicts between experts surface the most important design decisions. The plan is built on top of that, not before it.
+This skill exists for one step: **before writing code, check the plan's
+load-bearing claims against reality.** Everything else here is ordinary
+planning, kept deliberately short.
 
-**The rhythm:** DIAGNOSE → PROPOSE TEAM (user approves) → EXPERT RESEARCH (parallel) → CONFLICT SURFACE → DRAFT v1 → KPIs & GATES → EXPERT CROSS-CHECK (the same team verifies the plan against live ground truth) → FRESH-EYES SYNTHESIS CHECK → HARDEN → v2
+Hallucinated references are measured at 4.6–6.1% in current models, and about
+43% of them reproduce identically on retry — so asking again is not a check.
+Going and looking is.
 
-No skipping steps within the chosen gear. No starting code in the same turn as v2.
+## Scale
 
-## Scale gear — pick deliberately, before Step 1
+Full rhythm costs roughly 10× direct planning on a mid-size task. Pay it when
+being wrong is expensive: money, health, safety, irreversible mutations, ≥3
+phases, unfamiliar architecture, or a prior attempt that already failed.
 
-The full rhythm is correct when being wrong is expensive. On a mid-size task it is roughly 10× slower than direct planning — pay that cost only where it buys safety.
+Otherwise run it small: one or two researchers, verification folded into one
+pass. State which gear you chose and why, in one line.
 
-**FULL** (everything below, as written) when ANY of these hold: a money/health/safety path (trading, billing, auth, irreversible mutations); ≥3 phases; new architecture or an unfamiliar domain; a prior attempt already failed; the user asked for thorough.
+The test is blast radius, not diff size.
 
-**LITE** when ALL of these hold: ≤2 phases, single well-understood domain, no money-critical surface, reversible. Lite means:
-- 2 experts (not 3–5) — still researched, still typed advisory/technical
-- Conflict surfacing folded into the v1 draft (state the one real tension inline)
-- One combined verification round: each expert cross-checks their lane AND the fresh-eyes synthesis check runs in the same parallel batch
-- Skip HEART; keep the North Star only if the plan claims a metric will move
-- Two user checkpoints total — team proposal and v2 greenlight — plus the always-on scope-change pause
-- Still binding in LITE if their trigger applies: the security-seat rule and the threat-model block (a 2-phase task can still touch user input, secrets, or a new dependency). LITE trims process volume, never the security floor.
+## 1 — Diagnose
 
-**SKIP** the skill entirely for trivial single-step tasks.
+Before any planning, answer four things from the code and the conversation:
 
-State the chosen gear and why in one line at the top of the diagnosis. When in doubt between FULL and LITE, the money/irreversibility test decides — not the size of the diff.
+- **The goal as an outcome, not a task.** "Build topic discovery" is a task.
+  "Publish 12 high-authority articles a week without more editorial time" is a
+  goal. If given a task, find the goal behind it.
+- **Current state, concretely.** Metrics, file paths, constraints. Read the
+  code. No vague "we have issues."
+- **Why this is not already solved.** Missing data, wrong abstraction, wrong
+  sequencing, unclear ownership. This is what separates a plan from a patch.
+- **What needs external research.** Specific current-state questions, not
+  background reading.
 
-## Model tiering (when spawning Claude subagents)
+Present it tight. The point is to show you understand the problem.
 
-Every expert/reviewer subagent gets an explicit `model` matched to the work — never default blindly:
+## 2 — Research
 
-| Tier | Use for | Examples |
-|------|---------|----------|
-| **haiku** | Simple, mechanical, high-volume | research sweeps, inventory/health scans, doc lookups, table-state audits, consistency checks |
-| **sonnet** | The default for most real work | domain research with judgment, focused implementation, independent code reviews, cross-checks |
-| **opus** | Advanced reasoning / most technical | novel algorithm design, credit-assignment/attribution math, safety-critical mechanism design, deep multi-layer root-cause work |
-| **fable** | **YMYL (Your Money or Your Life)** | anything where a wrong judgment costs real money, health, or safety: financial risk audits, position/portfolio judgment, go-live verdicts, final validation of money-critical changes |
+Spawn researchers only where genuinely different expertise changes the answer.
+What makes this work is **diverse priors, not the number of agents** — two
+perspectives that actually differ beat five that agree. Structural ceremony
+around them buys nothing measurable.
 
-Rules of thumb: the PROPOSE TEAM table must carry a **Model** column per expert (the user approves tiering with the team). Cross-check verifiers usually match the original expert's tier. When a finding's blast radius is financial, escalate the verifier to **fable** even if the original researcher was smaller. Cost discipline: prefer the smallest tier that genuinely carries the reasoning load — but never put haiku on judgment calls or opus-class math. Brief by tier: haiku dispatches get low-freedom, prescriptive briefs (exact questions, exact output format, word budget); opus/fable dispatches get goals and constraints — over-specifying wastes their judgment.
+Each researcher gets: today's date, the goal and current state verbatim,
+specific questions, and a word budget (600–900). Without a budget they ramble.
 
----
+Require file:line for code claims, URLs with a search date for external ones.
 
-## Step 1 — DIAGNOSE
+Run them in parallel, in one message. Read every output before drafting.
 
-Before assembling the team, understand the problem. This is not a planning step — it is a root-cause step. Answer these questions from the conversation context, existing code, and your own knowledge:
+If research reveals the task is materially different from what was assumed — a
+dependency is dead, a cost is 10× the estimate, the feature already exists —
+**stop and confirm the revised scope.** Do not absorb a scope change silently.
 
-**What is the actual goal?**
-State it as an outcome, not a task. "Build an agentic topic-discovery workflow" is a task. "Increase the number of high-authority articles published per week from 3 to 12 without increasing human editorial time" is a goal. If the user gave you a task, find the goal behind it.
+## 3 — Draft
 
-**What is the current state?**
-Concrete metrics, file paths, known constraints. No vague "we have issues" — name them. Read key files if needed.
+Full section formats in `reference/templates.md` §3. The plan must deliver:
 
-**Why hasn't this been solved already?**
-Name the actual blockers: missing data, wrong architecture, wrong abstraction, wrong sequencing, unclear ownership. This is what separates a real plan from a patch.
+- **Goal** — one sentence, quantified: number, unit, deadline.
+- **Current state** — metrics and file paths, not adjectives.
+- **Phases as vertical slices** — a user-visible capability end to end, never a
+  horizontal layer. Greenfield starts with a walking skeleton: the thinnest
+  end-to-end path, proven live before anything is built on it.
+- **Math sanity check** — formula and plugged values for every number claimed.
+- **Threat model** — required when a phase touches auth, user input, secrets,
+  new dependencies, payments, or agent-executed tools. Spoofing, tampering,
+  disclosure, privilege escalation: one concrete line each, each naming the
+  test that covers it. A threat with no covering test is an open plan item.
+- **Operational readiness** — per behavior-changing phase: the signal that
+  proves it works in production, the rollout lever, the rollback path
+  (migrations expand-contract), a one-line runbook.
+- **Unit-of-work list** — what `ship` executes, in order. Each unit is the
+  smallest independently shippable change and **carries the command that
+  verifies it plus its pass condition**. A unit with no check is not ready to
+  plan. Resolve that here, where it is cheap.
+- **Open questions** — unresolved after research. Do not hide them.
 
-**Which disciplines does this problem touch?**
-List them. Some are advisory (they shape what the solution must achieve), some are technical (they shape how it gets built). You will use this list to compose the expert team.
+Flag any phase over ~400 changed lines for a split. Review depth collapses past
+that, and agent-written diffs trend larger than they need to be.
 
-**What research is needed?**
-Each expert will search online. Identify the specific questions that need external answers — not general background, but specific current-state questions (e.g. "what is the current state of GEO optimization for AI-cited articles as of [today]?", "what are the latency characteristics of Claude claude-sonnet-4-6 tool-use chains at 50 concurrent requests?").
+Every gate is a number with a unit and a command that measures it. See
+`reference/kpis.md` for translating adjectives into numbers.
 
-Present the diagnosis to the user in one concise block before moving to team composition. Keep it tight — the point is to show you understand the problem, not to write a plan.
+## 4 — Verify against ground truth
 
----
+This is the step that justifies the skill.
 
-## Step 2 — PROPOSE EXPERT TEAM (user must approve before spawning)
+Send the plan back to the researchers from step 2 — via `SendMessage` to their
+existing agent IDs, or fresh spawns with the original findings pasted in. A
+fresh spawn without its predecessor's research verifies with amnesia.
 
-Based on the diagnosis, propose 3–5 experts. For each, state:
+The brief matters, and it is **not** hostile:
 
-- **Role name** — descriptive and specific (not "technical expert" — "AI pipeline architect" or "SEO/GEO/AEO specialist")
-- **Type** — `advisory` or `technical`
-  - *Advisory*: produces direction, constraints, and traps. Reads code to understand context. Does NOT own implementation files.
-  - *Technical*: produces direction AND a concrete implementation approach. Owns specific domains in the codebase.
-- **Why this expert is on the team** — which part of the problem they cover, and what blind spot goes uncovered without them
-- **Research mandate** — 2–4 specific online questions they will search + which codebase areas they will read
-- **What they will NOT handle** — explicit exclusion, so there is no overlap ambiguity
+> You researched this. Now verify the plan against LIVE ground truth in your
+> domain. For every load-bearing claim, confirm or refute it with evidence:
+> read the actual file:line, run the actual read-only query, check the actual
+> current third-party behavior. Do not invent failure modes from priors. If the
+> plan rests on a number — a word count, a row count, a price, a model
+> behavior — go get the real number and report whether the assumption holds.
+> Today is [date]. Your job is to make the plan TRUE, not to break it.
 
-Present the proposed team as a table. Wait for the user to approve, add, remove, or swap experts before spawning anything.
+A reviewer told to find gaps reports some even when the work is sound, and
+chasing invented findings produces over-engineering. Hostility is the wrong
+setting here; verification is the right one.
 
-**On team composition:**
-- Don't default to generic roles. "Backend engineer" is weak. "Event-driven pipeline architect (message-queue + serverless functions)" is what you want.
-- Advisory experts are not lesser — an SEO/GEO/AEO expert who has read the current literature shapes the entire article structure. Their absence means the technical experts build the wrong thing perfectly.
-- 3 focused experts beat 6 shallow ones. Prefer depth.
-- **Security seat rule**: if the plan touches auth, user input parsing, secrets, new dependencies, payments, or agent-executed tools, the roster MUST include a security-typed expert (advisory or technical). AI-generated code fails security testing at ~45% in current benchmarks; the missing security seat is the most common roster blind spot. Their requirements bind like any advisory expert's.
-- If the problem is purely technical, you may have 0 advisory experts. If it is a product/strategy problem, you may have 0 implementors. Match the team to the problem.
+Required back from each:
 
----
+- **Claims confirmed or refuted**, each with the file:line, query result, or URL.
+- **Numbers that were wrong** — the highest-value output. "Plan assumes 500-word
+  articles; live p50 is 2,598."
+- **Real failure modes**, grounded in verified current behavior only.
+- **Sequencing corrections** — a phase needing data an earlier phase has not
+  produced, checked against the live schema.
+- **What holds** — so hardening does not thrash the parts that were right.
 
-## Step 3 — EXPERT RESEARCH PHASE (all experts run in parallel)
+Then one **synthesis check**: a verifier who was not on the roster, given only
+the plan and the raw research. Not the conversation, not the cross-checks.
 
-Once the user approves the team, spawn all experts as subagents in a **single message** (parallel, not sequential).
+> Verify the synthesis, not the world. The research is your only evidence.
+> Does each phase follow from it, or does the plan over-extrapolate? Quote any
+> finding the plan distorted, ignored, or stretched. Which findings did it
+> silently drop? ≤500 words.
 
-**Every expert subagent prompt must include:**
+Domain experts each check their own lane; nobody checks the space between
+lanes, and the synthesis is yours, so you cannot check it yourself.
 
-1. **Today's date** — pass it explicitly so online research is anchored to the current state of the world, not the model's training cutoff.
-2. **Their role and type** (advisory or technical)
-3. **The goal and current state** from Step 1 — verbatim, not paraphrased
-4. **Their research mandate** — the specific online questions to answer + codebase areas to read
-5. **Their exclusions** — what they are not responsible for
-6. **Required output structure** (see below)
-7. **A word budget** — typically 600–900 words. Experts who ramble without one produce noise.
+If verification refutes a core assumption, that is a scope change. Surface it
+before hardening.
 
-**Required output structure for each expert:** read `reference/templates.md` §1 and paste it verbatim into every expert prompt (research summary with URLs and search date, codebase observations with file:line, falsifiable domain requirements, concrete traps, unresolved questions).
+## 5 — Harden
 
-Use `general-purpose` subagents (they have web search). Run all in **foreground** — you need all outputs before proceeding to conflict surfacing.
+Rewrite the plan with the corrections applied. Two rules:
 
----
+**Never quiet-rewrite.** Where a claim changed, show the original, the
+correction, and the evidence that forced it. A plan that silently absorbs its
+own corrections teaches nobody anything, including you.
 
-## Step 4 — CONFLICT SURFACING
+**End with one concrete next action** and the open decision stated plainly.
 
-Read all expert outputs. Before writing a single line of the plan, surface the tensions explicitly.
+Do not start implementing in the same turn. Hand off to `ship`.
 
-This step exists because the most important design decisions live in the conflicts, not the agreements. An SEO expert who wants daily re-crawls and an AI pipeline architect who says daily re-crawls will cost $8/day at current pricing are not both wrong — they are revealing a design constraint that must be resolved before the plan is written.
+## Anti-patterns
 
-Structure the conflict surface per `reference/templates.md` §2: each conflict with both positions cited, stakes, and 2–3 resolution options (not a decision yet); then gaps no expert covered; then surprising findings that change the problem framing.
+- Planning a task whose diff you could describe in one sentence.
+- Expanding a bug fix into user stories with acceptance criteria. Measured
+  case: the spec took longer to write and review than the fix would have.
+- A plan so long it gets partially ignored at execution — the failure mode is
+  real and it is not the executor's fault.
+- Adjectives where numbers belong: "fast", "robust", "scalable".
+- Verification that reasons from priors instead of going and looking.
+- Starting code in the same turn as the finished plan.
 
-Present this to the user. **Two classes of conflict require a hard pause before proceeding:**
+## Detail
 
-1. **Scope-changing findings** — if expert research reveals that the stated task is materially different from what was assumed (e.g. a dependency is unmaintained, a third-party cost is 10× higher than expected, a key feature already exists), surface it explicitly and ask the user to confirm the revised scope before writing v1. Example: "Expert research found that pytrends was archived in April 2025. This changes the feature from 'add GEO scoring' to 'fix trend data source + add GEO scoring.' Confirm scope?" Do not quietly absorb scope changes into the plan.
-
-2. **Consequential design decisions** — if experts disagree on something that determines the architecture (e.g. "do we accept $8/day re-crawl cost or constrain frequency?"), ask the user to decide now. Present the options and stakes; don't pick unilaterally.
-
-For conflicts you can resolve without the user (e.g. a technical tradeoff with a clear best answer based on expert evidence), resolve it and document why. Not every conflict needs a user decision — but scope changes and architecture choices always do.
-
----
-
-## Step 5 — DRAFT v1
-
-Write the v1 plan. Full section formats are in `reference/templates.md` §3 (plan structure) and §4 (expert list + unit-of-work list) — follow them verbatim. The required sections, and what each must deliver:
-
-- **Goal** — one-sentence outcome, quantified (number + unit + deadline)
-- **Current state** — concrete metrics, file paths, code references; name the issues
-- **Phases** — per phase: what changes, why this slot, expected metric impact with math, risk level + primary risk, which expert's findings drive it, and expected diff size (flag > ~400 changed lines for a split — review depth drops past that, and AI-assisted diffs trend larger than they need to be)
-- **Math sanity check** — formula + plugged values for every number the plan claims
-- **Threat model (lightweight)** — REQUIRED when any phase touches auth, user input parsing, secrets, new dependencies, payments, or agent-executed tools: spoofing / tampering-injection / info-disclosure / privilege-elevation, one concrete line each, and every threat names the gate or misuse test that covers it. A threat without a covering test is an open plan item.
-- **Operational readiness** — per behavior-changing phase: the observability signal that proves it works in production, the rollout lever (flag / canary / kill switch — or why plain deploy is safe), the rollback path (migrations must be expand-contract), and a one-line runbook
-- **Test-first scaffold** — REQUIRED before any code: per phase, unit (3–10) + integration (1–3) + ONE misuse test; `ship` runs these BEFORE production code, red first
-- **Open questions** — unresolved after expert research; don't hide them
-- **Unit-of-work list** — what `ship` executes, in order. Each unit is the smallest independently shippable change, and each carries **the command that verifies it** plus that command's pass condition. A unit with no check is not ready to plan; say so and resolve it here, where it is cheap. Note dependencies between units so they are sequenced, not discovered mid-build
-
-**Decompose phases as vertical slices** — a user-visible capability end-to-end — not horizontal layers. Greenfield plans start with a walking skeleton phase: the thinnest end-to-end path through the architecture, proven live before anything is built on top.
-
----
-
-## Step 6 — MEASURABLE KPIs & QUALITY GATES
-
-Every metric and gate is a number with a unit — not an adjective.
-
-Read `reference/kpis.md` for the adjective→number translation, the North
-Star + input metric shape, HEART, falsifiable gate formats, and stop
-conditions. Every gate needs a number and a measurement command.
-
-## Step 7 — EXPERT CROSS-CHECK (the dedicated team verifies the plan against live ground truth)
-
-There is no generic hostile red-team. A context-free reviewer reasons from priors and stale assumptions — it will "break" the plan against a version of the system that no longer exists, and push the team backward. Instead, the **same domain experts who researched the problem** now verify the v1 plan against **live ground truth**. They have the context; they are accountable to their field; they check the plan with real data, not invented failure modes.
-
-Re-engage the experts from Step 2 — via `SendMessage` to their existing agent IDs, or spawn fresh experts of the same roles. When spawning fresh, paste the original expert's Step-3 findings verbatim into the prompt: a fresh spawn without its predecessor's research verifies with amnesia. Technical experts verify code and data claims. Advisory experts whose requirements are load-bearing in v1 re-engage too — their claims (a ranking behavior, a compliance rule, a market convention) are verified against current online sources exactly the way code claims are verified against file:line. Run them in **foreground** — you need their output before hardening.
-
-Each expert's cross-check prompt must include:
-
-1. **The full v1 plan** — verbatim.
-2. **Today's date.**
-3. **Their domain** — the same one they researched. They check ONLY the claims and phases in their lane.
-4. **A verification brief (not a hostile one):**
-   > "You researched this problem. Now verify the v1 plan against LIVE ground truth in your domain. For every load-bearing claim the plan makes, confirm or refute it with evidence — read the actual file:line, run the actual query against live data (read-only), check the actual current third-party behavior online. Do NOT invent failure modes from priors; if the plan rests on a number (a word count, a row count, a price, a model behavior), GO GET THE REAL NUMBER and report whether the plan's assumption holds. Today's date is [date]. Your job is to make the plan TRUE, not to break it."
-5. **Required output per expert:**
-   - **Claims verified** — each load-bearing claim in their lane → confirmed/refuted, with the file:line, query result, or URL that proves it.
-   - **Numbers that were wrong** — any quantitative assumption the plan made that the live data contradicts (the single highest-value output — e.g. "plan says articles are 500w; live p50 is 2,598w").
-   - **Real failure modes** — only those grounded in verified current behavior (a gate that will actually fire on real packs, a real rate limit, a real cost), with the evidence.
-   - **Sequencing / dependency corrections** — any phase that demands data a prior phase hasn't produced yet, verified against the live schema.
-   - **What the plan got RIGHT** — explicitly confirm the parts that hold, so hardening doesn't thrash them.
-6. **Word budget**: 600–900 words per expert. file:line for code, query results for data, URLs for third-party claims.
-
-Spawn the experts in **parallel** (single message), **foreground**. Read every cross-check before Step 8. If the experts surface a **scope-changing** correction (a core assumption is false against live data), pause and surface it to the user before hardening — the same way Step 4 pauses on scope changes.
-
-### Step 7b — FRESH-EYES SYNTHESIS CHECK (one verifier, no prior context)
-
-Each domain expert verifies their own lane; nobody checks the space between the lanes — and the synthesis is yours, so you cannot fresh-eyes it yourself. Spawn ONE verifier who was not on the roster and has no conversation context. They receive exactly two things: the v1 plan and the raw Step-3 expert findings. Not the conversation, not the cross-check outputs.
-
-Brief:
-> "Verify the synthesis, not the world. The experts' findings are your only evidence — do not research beyond them, do not invent failure modes from priors. Answer: (1) Does each phase actually follow from the evidence, or does the plan over-extrapolate somewhere? Quote any expert finding the plan distorted, ignored, or stretched. (2) Is there an alternative framing of the SAME evidence that would change a phase or the sequencing? Propose at most one, and only if it is load-bearing. (3) Which expert findings did the plan silently drop? Cite the expert section for every claim. ≤500 words."
-
-Model: sonnet by default; escalate to fable when the plan touches money paths (per the tiering table). Run it in the same parallel batch as the expert cross-checks — it needs only v1 and the Step-3 findings, both already available.
-
-This restores fresh-context review without restoring the context-free hostile reviewer the v3 redesign removed: the verifier is identity-fresh but evidence-bound. Its findings feed Step 8 alongside the expert cross-checks.
-
----
-
-## Step 8 — HARDEN (produce v2 as explicit deltas on v1)
-
-Produce v2 per `reference/templates.md` §6 — the required sections, in order: **what v1 got wrong** (quote the v1 claim, then the correction, with the file:line / query result / URL — or the distorted expert finding — that proved it; never quiet-rewrite); **numbers the cross-check corrected** (v1 assumption → real value → which phase changes); **real failure modes → how v2 addresses each** (new gate / test / phase / sequencing change); **missing edge cases now covered** (each mapped to a named test); **scalability risk → mitigation** (ceiling stated, load test in a phase exit gate); **what the cross-check confirmed was right** (so hardening doesn't thrash it); **corrected sequencing, math, KPIs & gates** (show deltas); **updated test-first scaffold**; **updated unit-of-work list**; **ready-to-start step** (ONE concrete next action).
-
-End by asking the user to greenlight a specific decision before code starts. Do NOT start implementing in the same turn as v2.
-
----
-
-## Unattended mode
-
-Only active when the user explicitly pre-authorized autonomous planning ("plan it overnight, don't wait for me"). Ambiguity means attended. A plan is a document, not a deployment, so checkpoints degrade instead of blocking:
-
-- **Team approval (Step 2)** → log the proposed team with one line of justification per expert and proceed.
-- **Scope-change and design-decision pauses (Steps 4 and 7)** → apply the same test as below: if a conservative interpretation exists (smaller scope, cheaper option, reversible default), take it, plan for it, and record what you would have asked; if the correction is architecture-determining with no conservative default, halt per the rule below. A Step-7 live-data refutation of a core assumption usually has no safe default — expect it to halt.
-- **v2 greenlight (Step 8)** → the plan ends with the open decision stated, not with code started.
-
-Every auto-resolved checkpoint goes into a **"Decisions made without you"** block at the TOP of v2 — the first thing the user reads, before the goal. One thing still halts: a consequential, architecture-determining decision with no conservative default. Deliver the decision brief as the output instead of a guessed plan.
-
----
-
-## Before presenting v2
-
-Read `reference/checklist.md` — what a good plan looks like, the
-anti-patterns this skill exists to prevent, and the final do-confirm.
+`reference/templates.md` — section formats.
+`reference/kpis.md` — adjective→number translation, gate formats.
+`reference/checklist.md` — pre-flight before presenting the plan.
