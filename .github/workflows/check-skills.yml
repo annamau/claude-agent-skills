@@ -1,0 +1,30 @@
+name: check-skills
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  limits:
+    name: skill size + frontmatter limits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install tiktoken
+      - name: every SKILL.md must survive compaction
+        run: python3 scripts/check_skills.py
+
+  hooks:
+    name: hook contract tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: hooks must deny what they claim to deny
+        run: python3 skills/ship/hooks/test_hooks.py

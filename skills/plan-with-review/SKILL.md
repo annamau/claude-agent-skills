@@ -1,6 +1,6 @@
 ---
 name: plan-with-review
-description: Use when the user asks to create or refine a non-trivial implementation plan, strategy doc, multi-phase rollout, architectural plan, or roadmap. Assembles a dynamic team of domain experts who research online + read the codebase, surfaces conflicts between expert views, drafts a plan from synthesized expert inputs, then has the same expert team verify it against live ground truth (real file:line, real queries, real third-party behavior) before any code gets written. The resulting plan includes a Team Roster that phases-execution can consume directly. Triggers on phrases like "create a plan", "let's plan", "draft a roadmap", "design the rollout", "how should we approach", "before we start, plan...", "plan this out". Two gears — full rhythm for high-stakes or multi-phase work, lite (2 experts, merged verification) for mid-size tasks. Skip for trivial single-step tasks.
+description: Use when the user asks to create or refine a non-trivial implementation plan, strategy doc, multi-phase rollout, architectural plan, or roadmap. Assembles a dynamic team of domain experts who research online + read the codebase, surfaces conflicts between expert views, drafts a plan from synthesized expert inputs, then has the same expert team verify it against live ground truth (real file:line, real queries, real third-party behavior) before any code gets written. The resulting plan hands off to the `ship` skill for execution. Triggers on phrases like "create a plan", "let's plan", "draft a roadmap", "design the rollout", "how should we approach", "before we start, plan...", "plan this out". Two gears — full rhythm for high-stakes or multi-phase work, lite (2 experts, merged verification) for mid-size tasks. Skip for trivial single-step tasks.
 license: MIT
 metadata:
   author: annamau
@@ -136,7 +136,7 @@ For conflicts you can resolve without the user (e.g. a technical tradeoff with a
 
 ## Step 5 — DRAFT v1
 
-Write the v1 plan. Full section formats are in `reference/templates.md` §3 (plan structure) and §4 (Team Roster) — follow them verbatim. The required sections, and what each must deliver:
+Write the v1 plan. Full section formats are in `reference/templates.md` §3 (plan structure) and §4 (expert list + unit-of-work list) — follow them verbatim. The required sections, and what each must deliver:
 
 - **Goal** — one-sentence outcome, quantified (number + unit + deadline)
 - **Current state** — concrete metrics, file paths, code references; name the issues
@@ -144,9 +144,9 @@ Write the v1 plan. Full section formats are in `reference/templates.md` §3 (pla
 - **Math sanity check** — formula + plugged values for every number the plan claims
 - **Threat model (lightweight)** — REQUIRED when any phase touches auth, user input parsing, secrets, new dependencies, payments, or agent-executed tools: spoofing / tampering-injection / info-disclosure / privilege-elevation, one concrete line each, and every threat names the gate or misuse test that covers it. A threat without a covering test is an open plan item.
 - **Operational readiness** — per behavior-changing phase: the observability signal that proves it works in production, the rollout lever (flag / canary / kill switch — or why plain deploy is safe), the rollback path (migrations must be expand-contract), and a one-line runbook
-- **Test-first scaffold** — REQUIRED before any code: per phase, unit (3–10) + integration (1–3) + ONE misuse test; the implementer in phases-execution runs these BEFORE production code
+- **Test-first scaffold** — REQUIRED before any code: per phase, unit (3–10) + integration (1–3) + ONE misuse test; `ship` runs these BEFORE production code, red first
 - **Open questions** — unresolved after expert research; don't hide them
-- **Team Roster + file-ownership map** — the block phases-execution consumes directly (§4); advisory experts listed with binding requirements, technical experts with owns / does-not-touch / mandate / depends-on, AND a per-phase **exclusive file set**. Execution runs the team concurrently in ONE shared worktree, so disjoint ownership is what makes phases parallelizable — two phases needing the same file must be merged, split, or sequenced HERE, at plan time; files shared by nature (barrel exports, route tables, migration indexes) are declared ledger files
+- **Unit-of-work list** — what `ship` executes, in order. Each unit is the smallest independently shippable change, and each carries **the command that verifies it** plus that command's pass condition. A unit with no check is not ready to plan; say so and resolve it here, where it is cheap. Note dependencies between units so they are sequenced, not discovered mid-build
 
 **Decompose phases as vertical slices** — a user-visible capability end-to-end — not horizontal layers. Greenfield plans start with a walking skeleton phase: the thinnest end-to-end path through the architecture, proven live before anything is built on top.
 
@@ -156,75 +156,15 @@ Write the v1 plan. Full section formats are in `reference/templates.md` §3 (pla
 
 Every metric and gate is a number with a unit — not an adjective.
 
-### Adjective → number translation
-
-| Adjective | Required form |
-|-----------|--------------|
-| "good performance" | `p95 latency < 200ms over 1h window` |
-| "no regressions" | `North Star within ±2pts of baseline for 7d` |
-| "high quality" | `≥ 95% of test cohort meets exit gate G3` |
-| "scales well" | `tested at 10x current QPS; p95 budget holds` |
-| "secure" | `OWASP top-10 checklist signed off + 1 hostile-input test green` |
-
-If you cannot translate an adjective into a number with a unit, drop it.
-
-### North Star + input metrics
-
-Formats: `reference/templates.md` §5. ONE externally validated North Star — something the world tells us, not something we compute about ourselves — with precise definition, cadence, today's baseline, and milestone targets. Then 3–6 input metrics max, each with definition, today's value, target, and owning phase.
-
-Each phase must move at least one input metric. If a phase doesn't, it doesn't belong.
-
-### HEART (user-facing health — orthogonal to North Star)
-
-When the plan changes a system users depend on, include the HEART table (`reference/templates.md` §5): Happiness, Engagement, Adoption, Retention, Task Success — each with a metric and a numeric red-flag threshold.
-
-**Baseline capture — required when any HEART threshold says "vs. baseline":**
-For each HEART metric that uses a comparative threshold (e.g. "drop > 30% vs. 14d baseline"),
-explicitly state:
-- **When** the baseline is captured (e.g. "7 days before Phase 1 ships" — not "before we start")
-- **Who** captures it (the planner? a cron? a specific script?)
-- **Where** it is stored so it can be compared later
-
-A HEART threshold without a named baseline capture plan is decorative — add a Phase 0 or
-pre-execution step if needed. The expert cross-check will catch ungated baselines; fix them in v1.
-
-If a phase trips a HEART red flag, halt. Don't ship the next phase on top of a regression.
-
-### Quality gates — falsifiable, with numbers
-
-Each phase has **entry criteria** (must be true to start) and **exit criteria** (must be true to ship).
-
-**Universal exit criteria:**
-- All existing tests pass + new tests added — green
-- North Star and input metrics do not regress beyond explicit allowance
-- HEART metrics within threshold
-- Independent reviewer subagent on the PR returns zero unresolved correctness findings
-- Code coverage for changed files ≥ 80% (or project standard, named explicitly), and coverage on changed files never decreases
-- Performance budget: p95 / p99 target stated and load tested
-- Security floor: secrets scan on the diff is clean; every NEW dependency verified real on the public registry (mature, known maintainer) and pinned in the lockfile — ~20% of AI-suggested package names are hallucinated and squatters register them; SAST clean where the repo has it configured
-
-**Phase-specific gates:** format in `reference/templates.md` §5 — every exit criterion falsifiable with a number and a unit, plus a scalability check where the plan named a load ceiling.
-
-### Stop conditions
-
-Format: `reference/templates.md` §5. Name the conditions under which the thesis is wrong (pivot), the software is unusable (halt), or a phase must roll back — each with a number and a time window.
-
-### KPI anti-patterns (fix these in v1 — reviewer will catch them)
-
-- **Self-graded North Star** — the metric must be externally validated
-- **Adjective KPIs** — translate or delete
-- **Too many input metrics** — > 6 means nobody watches them
-- **Lagging-only metrics** — mix leading and lagging
-- **Gates that always pass** — real gates fail sometimes; decorative gates are theater
-- **Ungated billing** — any charge to users needs a billing-correctness exit criterion
-
----
+Read `reference/kpis.md` for the adjective→number translation, the North
+Star + input metric shape, HEART, falsifiable gate formats, and stop
+conditions. Every gate needs a number and a measurement command.
 
 ## Step 7 — EXPERT CROSS-CHECK (the dedicated team verifies the plan against live ground truth)
 
 There is no generic hostile red-team. A context-free reviewer reasons from priors and stale assumptions — it will "break" the plan against a version of the system that no longer exists, and push the team backward. Instead, the **same domain experts who researched the problem** now verify the v1 plan against **live ground truth**. They have the context; they are accountable to their field; they check the plan with real data, not invented failure modes.
 
-Re-engage the experts from the Team Roster — via `SendMessage` to their existing agent IDs, or spawn fresh experts of the same roles. When spawning fresh, paste the original expert's Step-3 findings verbatim into the prompt: a fresh spawn without its predecessor's research verifies with amnesia. Technical experts verify code and data claims. Advisory experts whose requirements are load-bearing in v1 re-engage too — their claims (a ranking behavior, a compliance rule, a market convention) are verified against current online sources exactly the way code claims are verified against file:line. Run them in **foreground** — you need their output before hardening.
+Re-engage the experts from Step 2 — via `SendMessage` to their existing agent IDs, or spawn fresh experts of the same roles. When spawning fresh, paste the original expert's Step-3 findings verbatim into the prompt: a fresh spawn without its predecessor's research verifies with amnesia. Technical experts verify code and data claims. Advisory experts whose requirements are load-bearing in v1 re-engage too — their claims (a ranking behavior, a compliance rule, a market convention) are verified against current online sources exactly the way code claims are verified against file:line. Run them in **foreground** — you need their output before hardening.
 
 Each expert's cross-check prompt must include:
 
@@ -258,7 +198,7 @@ This restores fresh-context review without restoring the context-free hostile re
 
 ## Step 8 — HARDEN (produce v2 as explicit deltas on v1)
 
-Produce v2 per `reference/templates.md` §6 — the required sections, in order: **what v1 got wrong** (quote the v1 claim, then the correction, with the file:line / query result / URL — or the distorted expert finding — that proved it; never quiet-rewrite); **numbers the cross-check corrected** (v1 assumption → real value → which phase changes); **real failure modes → how v2 addresses each** (new gate / test / phase / sequencing change); **missing edge cases now covered** (each mapped to a named test); **scalability risk → mitigation** (ceiling stated, load test in a phase exit gate); **what the cross-check confirmed was right** (so hardening doesn't thrash it); **corrected sequencing, math, KPIs & gates** (show deltas); **updated test-first scaffold**; **updated Team Roster**; **ready-to-start step** (ONE concrete next action).
+Produce v2 per `reference/templates.md` §6 — the required sections, in order: **what v1 got wrong** (quote the v1 claim, then the correction, with the file:line / query result / URL — or the distorted expert finding — that proved it; never quiet-rewrite); **numbers the cross-check corrected** (v1 assumption → real value → which phase changes); **real failure modes → how v2 addresses each** (new gate / test / phase / sequencing change); **missing edge cases now covered** (each mapped to a named test); **scalability risk → mitigation** (ceiling stated, load test in a phase exit gate); **what the cross-check confirmed was right** (so hardening doesn't thrash it); **corrected sequencing, math, KPIs & gates** (show deltas); **updated test-first scaffold**; **updated unit-of-work list**; **ready-to-start step** (ONE concrete next action).
 
 End by asking the user to greenlight a specific decision before code starts. Do NOT start implementing in the same turn as v2.
 
@@ -276,51 +216,7 @@ Every auto-resolved checkpoint goes into a **"Decisions made without you"** bloc
 
 ---
 
-## What good looks like
+## Before presenting v2
 
-A v2 plan that:
-- Was built from expert research, not from Claude's priors
-- Names exactly which v1 claims were wrong, with corrections next to them
-- Lists 3 failure scenarios with the gate / test / phase change that catches each
-- Has a sequencing table where every phase's slot is justified
-- Closes the math (the target is reachable given the formula, OR the formula is being changed)
-- Has zero adjective-only metrics
-- Lists per-phase unit + integration + misuse tests, with misuse tests visibly adversarial
-- States a scalability ceiling and how phase N's exit gate proves it holds
-- Carries a Team Roster that phases-execution can consume without re-deriving the team
-- States its gear (FULL/LITE) up front and carries the fresh-eyes verifier's verdict on the synthesis
-- Ends with one specific question for the user, not "shall I proceed?"
-
-## Anti-patterns this skill prevents
-
-- **Planning from priors**: drafting a plan before consulting domain experts and current online research. The experts shape the plan, not vice versa.
-- **Aligned expert teams**: picking experts who will agree with each other. The conflict surfacing step only has value if the experts have genuinely different perspectives.
-- **Advisory experts as decoration**: listing an SEO expert but not letting their requirements constrain the technical design. Advisory requirements are non-negotiable inputs.
-- **Plan-and-ship in one breath**: writing a plan and starting code in the same turn skips the review gate.
-- **False code citations**: the expert cross-check reads actual files and will catch this.
-- **Math that doesn't close**: the cross-check plugs the numbers against live data.
-- **Self-graded victory**: choosing an internal score as North Star.
-- **Ungated billing**: billing without a phase exit criterion proving Stripe idempotency + refund path.
-- **Context-free reviewer reasoning from priors**: a generic hostile reviewer with no shared context "breaks" the plan against a version of the system that no longer exists, pushing the team backward. The cross-check is done by the dedicated experts who have the context and verify against LIVE ground truth — they make the plan true, not break a strawman.
-- **Assuming instead of measuring**: when the plan rests on a number (word count, row count, price, model behavior), GO GET THE REAL NUMBER from live data before hardening — never harden against an assumed value.
-- **Test-after-code**: test scaffold ships with the plan, before any production code.
-- **Stale research**: experts receive today's date and cite search dates. Plans built on 18-month-old API pricing or deprecated library patterns are rejected.
-- **One-size process**: running the FULL rhythm on a mid-size task burns tokens and user patience without buying safety. Pick the gear deliberately and say which in the diagnosis.
-- **Unverified synthesis**: every expert checks their own lane; the gaps BETWEEN lanes are where a plan quietly fails. That is the fresh-eyes verifier's lane — don't skip it because the experts all passed.
-
----
-
-## Final do-confirm (run after drafting v2, before presenting it)
-
-Do-confirm, not read-do: you already did the work — this catches what slipped. Confirm each item; any miss means v2 is not ready to present:
-
-- [ ] Gear declared (FULL/LITE) with a one-line justification at the top of the diagnosis
-- [ ] Every expert searched online with today's date and cited their search dates
-- [ ] Conflicts surfaced BEFORE drafting; scope changes were user-confirmed, never quietly absorbed
-- [ ] Security seat on the roster if the plan touches auth / input / secrets / deps / payments / agent tools
-- [ ] Cross-check verified every load-bearing claim against LIVE data (file:line, query result, URL) — no number hardened from an assumption
-- [ ] Fresh-eyes synthesis check ran, and its findings are addressed (or explicitly rebutted) in v2
-- [ ] Zero adjective-only metrics; the math closes; every comparative baseline has a named capture plan (when / who / where)
-- [ ] Threat model + operational readiness blocks present where required
-- [ ] Test-first scaffold per phase; misuse tests visibly adversarial
-- [ ] Team Roster complete and typed, with a file-ownership map whose in-flight sets are disjoint (shared-by-nature files declared as ledger files); v2 ends with ONE specific question for the user
+Read `reference/checklist.md` — what a good plan looks like, the
+anti-patterns this skill exists to prevent, and the final do-confirm.

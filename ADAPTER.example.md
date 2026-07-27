@@ -19,7 +19,7 @@ so the hawk and review skills resolve the placeholders below.
 - Reviewer must be a DIFFERENT vendor/family than the implementer (that is the whole point).
 - Setup (OpenAI Codex default): install the GitHub app for `{{REPO}}` and create a Codex cloud environment for it, else it posts a setup prompt instead of a real review.
 
-## Company brain (brain-builder / vault-librarian)
+## Company brain (brain)
 
 - Brain root: `brain/`
 - Keystone notes W-RECALL should read first (project-specific — rename as yours):

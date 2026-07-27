@@ -85,25 +85,25 @@ For each phase:
 - Integration tests: 1–3 cases hitting the real boundary the phase changes.
 - Misuse test: ONE test proving the system behaves safely when called wrong
   (bad input, race condition, partial state, permission edge, concurrent call).
-The implementer in phases-execution will run these BEFORE writing production code.
+The implementer in ship will run these BEFORE writing production code.
 
 ## Open questions
 [Things unresolved after expert research. Don't hide them — the reviewer will surface them anyway.]
 
-## Team Roster
-[See §4 — this block is consumed directly by phases-execution.]
+## Expert list
+[See §4 — this block is consumed directly by ship.]
 ```
 
-## 4. Team Roster format (Step 5)
+## 4. Expert list format (Step 5)
 
 ```
-## Team Roster
+## Expert list
 
 | Expert | Type | Owned domains | Explicit exclusions | Key findings summary |
 |--------|------|---------------|--------------------|--------------------|
 | [Role] | advisory / technical | [files, tables, services, or domain areas] | [what they don't touch] | [1–2 sentence summary of their most important findings] |
 
-### Role contracts (for phases-execution)
+### Role contracts (for ship)
 For each technical expert:
 - **Owns**: [specific files, directories, or system boundaries]
 - **Does not touch**: [explicit exclusions]
@@ -112,7 +112,7 @@ For each technical expert:
 
 Advisory experts are listed but have no implementation mandate. Their findings shape requirements; they do not write code.
 
-### File-ownership map (for phases-execution's shared-worktree team)
+### File-ownership map (for ship's shared-worktree team)
 
 ```
 | Phase | Owner (technical expert) | Exclusive file set |
@@ -126,7 +126,7 @@ Ledger files (owned by no one; edited only via a LOCKS.md claim, one holder at a
 
 Invariant: every file appears in at most ONE in-flight phase's set. Two phases needing the same file = merge them, split the file's concern, or sequence the phases — resolve it in the plan, not during execution.
 
-Note to phases-execution: this roster is a starting point. You may spawn additional agents based on implementation findings. You may not remove an advisory expert's requirements from the plan without explicit user approval.
+Note to ship: this roster is a starting point. You may spawn additional agents based on implementation findings. You may not remove an advisory expert's requirements from the plan without explicit user approval.
 ```
 
 ## 5. KPI & gate formats (Step 6)
@@ -211,7 +211,7 @@ Stop conditions:
 ## Updated test-first scaffold
 [Per phase: unit + integration + misuse, with new edge cases folded in.]
 
-## Updated Team Roster
+## Updated Expert list
 [If the cross-check surfaced a domain gap, add the expert or update existing contracts.]
 
 ## Ready-to-start step

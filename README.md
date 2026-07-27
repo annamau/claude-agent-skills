@@ -1,42 +1,79 @@
 # claude-agent-skills
 
-A toolkit of **agentic-engineering skills for [Claude Code](https://claude.com/claude-code)** — a supervised, multi-agent workflow for planning, building, reviewing, and remembering software work. Built and hardened in production, then generalized to be org-agnostic.
+Skills and hooks for [Claude Code](https://claude.com/claude-code) that make AI-assisted work verifiable: plan it, build it behind gates that emit real pass/fail signals, and learn from sessions that went badly.
 
-The through-line is one idea: **a single lead agent — the HAWK — runs a team of expert subagents as a distributed system, and nothing is "done" until a differently-trained model has checked it.** Agents drift, hallucinate, and rubber-stamp their own work; these skills are the guardrails that keep a long autonomous run honest.
+The through-line: **the thing that judges the work is never the thing that did the work** — and wherever a rule can be a mechanism instead of a sentence, it is a mechanism. Skill prose is advisory; a hook is not.
 
 ## The skills
 
-| Skill | Role | Use when |
-|---|---|---|
-| **plan-with-review** | Architect | You have a non-trivial idea and no plan. Assembles a domain-expert team that researches (online + in your codebase), surfaces conflicts, drafts a plan, then verifies it against live ground truth. Emits a **Team Roster + file-ownership map**. |
-| **phases-execution** | The HAWK (Product Owner + Tech Lead) | You have an approved multi-phase plan to execute, **or** a non-trivial refactor/rewrite to drive. Dispatches the expert team as a **concurrent team in one shared worktree** (ownership map + lock ledger), supervises them live (steers drift, escalates, answers their questions via research), runs a **cross-model review** on every functionality, forces an honest **patch-or-real-solution verdict** before each ship (no patches — escalate to a new plan instead), keeps a workflow board, and files postmortems when a session goes bad. |
-| **copilot-review-loop** | Cross-model PR gate | A PR is open and not yet merged. Triggers a differently-trained reviewer (default: OpenAI Codex), loops on findings with a hard cap, root-causes repeats, and applies a Product-Owner acceptance gate before "ready to merge." |
-| **brain** | Company-brain manager | Build, recall from, file into, and garden a repo-based **company brain** (a linked-markdown vault). One skill across scales — daily recall + single-note filing (`W-RECALL`, `W-FILE-FINDING`) through bulk ingestion and deep numeric-gated gardening (`W-INGEST-CAMPAIGN`, `W-GARDEN`). |
+| Skill | Use when |
+|---|---|
+| **plan** (`plan-with-review`) | A non-trivial idea and no plan. A small expert team researches online and in your codebase, surfaces conflicts, drafts a plan, then verifies it against live ground truth before code exists. |
+| **ship** | Executing approved work. Each unit runs a gate table where every gate is a command with an exit code or a reader who did not write the code. One unit per commit. |
+| **brain** | A repo-based company brain (linked markdown). Recall before work, file findings after, garden on a schedule. |
 
-`plan-with-review → phases-execution → copilot-review-loop` is the main pipeline. **brain** is the durable memory layer the hawk reads from before work and writes to after.
+`plan → ship` is the pipeline; **brain** is the memory either end reads from and writes to.
 
-## Design principles (why these exist)
+## The hooks (this is the part that actually holds)
 
-These skills encode a specific, sourced view of mid-2026 agentic-engineering practice:
+`skills/ship/hooks/` — wire these into `.claude/settings.json` and they enforce
+without your compliance:
 
-- **Supervisor over the swarm.** A lead agent that *routes and steers* rather than implements; steering a running worker beats kill-and-respawn until a retry cap; escalate to the human only for genuine product/scope calls. (Anthropic multi-agent research system; LangGraph supervisor pattern.)
-- **Team awareness, not isolation.** Workers share one worktree and a **file-ownership map + lock ledger** ("claim before edit"), and each knows what teammates own — the ownership map is the single most important coordination artifact. (Shared-workspace concurrency practice.)
-- **Verify with a different model.** LLMs favor their own output (self-preference bias); a same-family reviewer shares the implementer's blind spots. Every functionality gets reviewed by a differently-trained model before it ships. (Self-preference-bias literature.)
-- **A durable brain, not just context.** Long autonomous work needs memory that survives compaction: flat markdown in the repo, atomic notes, supersede-don't-overwrite, bi-temporal freshness (`updated` vs `verified`). (Agent-memory practice; ADR discipline; PKM methodology.)
-- **Detect poisoned sessions.** Cheap tripwires (repeated failed edits, test-pass regression, diff-churn-without-progress, agents echoing each other's wrong belief) trigger quarantine + respawn-from-curated-state; every bad session mints a blameless postmortem whose exit criterion is a **landed harness fix**. (Context-rot + sycophancy-propagation research.)
+| Hook | Enforces |
+|---|---|
+| `guard_git_writes.py` | Subagents cannot commit, push, or stash. Nobody runs `git add -A`. |
+| `guard_tests.py` | Test files are not editable during implementation; `tests/holdout/**` is never editable. |
+| `session_health.py` | Scores every session for friction; writes a postmortem when it trips. |
+
+`python3 skills/ship/hooks/test_hooks.py` — 38 contract tests. Run before wiring.
+
+## Why it is shaped this way
+
+Each of these is a measured finding, not a preference:
+
+- **Skills must fit in ~5,000 tokens.** After auto-compaction Claude Code re-attaches only the first 5,000 tokens of a skill. A previous version of `ship` was 14,496 tokens — 66% of it, including every gate, was silently dropped at exactly the moment it was needed. `scripts/check_skills.py` enforces the limit in CI.
+- **Agents saturate any test suite they can see.** Across 30 systems-level tasks, models scored near-identically on visible tests while held-out performance diverged sharply, and the gap grew with codebase size. Hence `tests/holdout/`.
+- **Blocking test edits during implementation is the highest-value single gate.** Penalising test modification cut hacked solutions from 28.57% to 0.56% while *raising* legitimate solve rate. Agent commits modify test files ~23% of the time versus ~13% for humans.
+- **A test never observed failing is not evidence.** Red before green, same command both times.
+- **Subagents are for context isolation, fresh-context review, and research fan-out.** Not for org charts. Role hierarchies were tried at scale and produced weak ideas and poor experiment hygiene; the coordination cost bought nothing the context budget argument doesn't already justify.
+- **Sessions leave measurable evidence of going wrong.** Grind depth, error streaks, repeat-edit counts and verify-loop length separate healthy sessions from bad ones. Thresholds in `session_health.py` were calibrated on a real 150MB transcript corpus, not chosen.
 
 ## Install
 
-Each directory under `skills/` is a self-contained Claude Code skill. Copy or symlink the ones you want into your skills directory:
-
 ```bash
-# symlink all six into your user skills dir
 for s in skills/*/; do
   ln -s "$(pwd)/$s" "$HOME/.claude/skills/$(basename "$s")"
 done
 ```
 
-Then `/plan-with-review`, `/phases-execution`, etc. become available (Claude Code discovers skills from that directory).
+Then `/plan-with-review`, `/ship`, `/brain` are available.
+
+To wire the hooks, add to your project's `.claude/settings.json` (project-local
+is strongly preferred over global — a `PreToolUse` deny has no documented escape
+mechanism, so scope it to one repo first):
+
+```jsonc
+{
+  "hooks": {
+    "PreToolUse": [
+      { "matcher": "Bash",
+        "hooks": [{ "type": "command",
+          "command": "python3 \"$HOME/code/claude-agent-skills/skills/ship/hooks/guard_git_writes.py\"" }] },
+      { "matcher": "Edit|Write|NotebookEdit|MultiEdit",
+        "hooks": [{ "type": "command",
+          "command": "python3 \"$HOME/code/claude-agent-skills/skills/ship/hooks/guard_tests.py\"" }] }
+    ],
+    "Stop": [
+      { "hooks": [{ "type": "command", "timeout": 60,
+        "command": "python3 \"$HOME/code/claude-agent-skills/skills/ship/hooks/session_health.py\"" }] }
+    ]
+  }
+}
+```
+
+Note: `claude -p --bare` skips hook discovery entirely. If you run headless in
+CI, pass `--settings` explicitly or re-run the same checks as CI steps —
+otherwise the enforcement silently is not there.
 
 ## Configuration (making them yours)
 
