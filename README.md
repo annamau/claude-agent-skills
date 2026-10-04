@@ -38,6 +38,13 @@ done
 
 Then `/plan-with-review`, `/phases-execution`, etc. become available (Claude Code discovers skills from that directory).
 
+## Variants
+
+Optional skills that live outside `skills/`, so the install loop above does not pick them up.
+
+- **brain-lite** (`variants/brain-lite/`) — a leaner take on `brain` for code projects: ~95-token description, ~880-token body, lazy reads (`brain/INDEX.md` first, then only the matching file), plus a stdlib-only `scripts/brain_lint.py` that checks line budgets, index drift, dead `covers:` paths, supersede chains and leaked secrets. Use it **instead of** `brain`, not alongside it — both manage `brain/`.
+  `ln -s "$(pwd)/variants/brain-lite" "$HOME/.claude/skills/brain-lite"`
+
 ## Configuration (making them yours)
 
 The skills are written generically. A few call sites reference **placeholders** you supply for your own project:
