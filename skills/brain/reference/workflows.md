@@ -1,6 +1,30 @@
-# Heavy workflows
+# Workflows
 
-Read the one you need, when you need it. The daily workflows (recall, file-finding, record-win, answer, ingest, maintain) are in SKILL.md.
+Read only the section you are running.
+
+## Daily
+
+### W-RECALL — recall current state (start of strategy work)
+Default: Read `brain/Home.md` and report from it. Go further only if Home is stale or the task needs it:
+
+Full recall (only when asked, or Home is clearly stale): Parallel-`Read` the keystone notes (e.g. `brain/Home.md`, `brain/30_Investigation/Thesis.md`, `brain/50_Roadmap-and-Checklist/Checklist-to-MVP.md`, `brain/50_Roadmap-and-Checklist/MVP-Definition.md` — a project may have differently-named keystone notes) → `Grep -l '^status: (doing|blocked)'` (files only) across `brain/**/*.md` → `Glob brain/55_Execution/boards/*/BOARD.md` and read any with `status: active` → report: the current thesis, distance-to-MVP (count of unmet exit conditions), what's in flight, what's blocked, **which hawk workflows are active and what files they own**. **Do this before acting on any project-strategy work** so you build on the brain, not from scratch — and so a new workflow doesn't claim files an active board already owns.
+
+### W-FILE-FINDING — file a new finding
+`Grep` for dups → pick the `finding` template (`00_Meta/Templates/`) → `Write` into `30_Investigation/{waves|canary|forensics}/` with `source`/`repo_link` → `Edit` `30_Investigation/_MOC.md` timeline + link from any goal/checklist-item it changes → if it spawns work, create a `checklist-item` and add it to the dashboard.
+
+### W-RECORD-WIN — record an accomplishment
+`Edit` the `checklist-item` frontmatter `status: done` → `Write` an `accomplishment` note (how/why/evidence `repo_link`) in `60_Decisions-and-Accomplishments/accomplishments/` → cross-link item↔accomplishment → re-render the `Checklist-to-MVP` Done section → `Edit` Home's pulse + distance-to-MVP.
+
+### W-ANSWER — "what does the brain say about X"
+`Grep` X across `brain/` → `Read` the top hits → synthesize a cited answer with `[[wikilinks]]`, flagging any `status: superseded` hits as stale.
+
+### W-INGEST — ingest one repo doc or memory file
+Read the source → classify: durable strategy → SUMMARY (or full copy if no code coupling); code-coupled → SUMMARY + `repo_link`; stale → no-ingest (flag in `80_References/Memory-Index.md`) → `Grep` dedupe → write in the mapped folder with `source` + `repo_link` → link from its MOC. For memory files apply the test **"would a new hire need this to understand the company's strategy in a year?"** — yes → brain note (collapse clusters into one `decision`/`accomplishment`); "only matters while touching that code path" → stays in memory.
+
+### W-MAINTAIN — light structure-maintenance pass (end of session / on request)
+Start by running `scripts/brain_lint.py` and fix its errors; then: The per-session sweep — mechanical hygiene on what changed this session (contrast W-GARDEN, the deep, scheduled, numeric-gated pass). `git log -- brain/` + `Glob` inventory vs taxonomy → check changed/new notes against the rules via `Grep` (missing frontmatter, MOC-orphans, dup titles, broken `[[links]]`) → repair via `Edit` → refresh every `_MOC.md` + Home's "recently changed" → archive anything now `superseded` → **archive closed boards** (`status: closed` → `90_Archive/boards/`) → flag postmortems missing a landed harness fix. Output a short maintenance report.
+
+## Vault-scale
 
 ### W-BOOTSTRAP — build a brain from zero (any repo)
 1. **Derive the domains from the org, don't copy another brain's.** Interview the repo + user: what is the product, what evidence exists, what decisions recur, what does "done" mean here? 5–8 domains max, numbered with gaps (`10_`, `20_`, …) so new domains slot in later.

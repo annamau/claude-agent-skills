@@ -48,6 +48,13 @@ done
 
 Then `/plan-with-review`, `/ship`, `/brain` are available.
 
+`brain` writes through a subagent, the **brain-librarian** (Sonnet, sole writer of the vault). Install it as a user-level agent:
+
+```bash
+mkdir -p "$HOME/.claude/agents"
+ln -s "$(pwd)/agents/brain-librarian.md" "$HOME/.claude/agents/brain-librarian.md"
+```
+
 To wire the hooks, add to your project's `.claude/settings.json` (project-local
 is strongly preferred over global — a `PreToolUse` deny has no documented escape
 mechanism, so scope it to one repo first):
